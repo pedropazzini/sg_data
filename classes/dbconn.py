@@ -15,7 +15,7 @@ class Dbconn:
 
         self.__psql_db = PostgresqlDatabase(config.get('Database','db'),user=config.get('Database','user'),password=config.get('Database','password'),host=config.get('Database','ip'),port=config.get('Database','port'))
 
-        self.__psql_engine_str = 'postgresql+psycopg2://' + config.get('Database','user') + ':' + config.get('Database','password') + '@' + config.get('Database','ip') + ':' + config.get('Database','port') + '/' + config.get('Database','db')
+        self.__psql_engine_str = 'postgresql+psycopg2://' + config.get('Database','user') + ':' + config.get('Database','password') + '@' + config.get('Database','ip') + ':' + config.get('Database','port') + '/' + config.get('Database','db') + '?connect_timeout=3'
 
     def get_conn(self):
         return self.__psql_db

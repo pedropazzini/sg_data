@@ -34,16 +34,17 @@ class Meter_data_dec(Base):
     def __repr__(self):
         return "<Meter_data (id_meter_data='%s', id_meter='%s', id_meter_data_collection='%s')>" % (self.id_meter_data, self.id_meter, self.id_meter_data_collection)
 
-class Row_data_dec(Base):
+class Raw_data_dec(Base):
 
-    __tablename__ = 'row_data'
+    __tablename__ = 'raw_data'
 
     id_meter = Column(Integer, primary_key=True)
     date = Column(Integer, primary_key=True)
+    d_time = Column(DateTime)
     kwh = Column(Float)
 
     def __repr__(self):
-        return "<Row_data(id_meter='%s', date='%s', kwh='%s')>" % (self.id_meter, self.date, self.kwh)
+        return "<Raw_data(id_meter='%s', date='%s', kwh='%s', d_time='%s')>" % (self.id_meter, self.date, self.kwh, self.d_time)
 
 class Normalized_measure_dec(Base):
 

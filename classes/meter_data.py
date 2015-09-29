@@ -1,10 +1,10 @@
 
 from sqlalchemy import Column, Integer, Float
 from classes.date import Smart_meter_date
-from declarative.classes import Row_data_dec
+from declarative.classes import Raw_data_dec
 from declarative.classes import Meter_data_dec
 from declarative.classes import Normalized_measure_dec
-from classes.row_data import Row_data
+from classes.raw_data import Raw_data
 from classes.normalized_measure import Normalized_measure
 from sqlalchemy.orm import sessionmaker
 import numpy as np
@@ -35,7 +35,7 @@ class Meter_data():
             self.insert()
 
 
-        r = Row_data()
+        r = Raw_data()
         v = []
         d = []
         for item in r.get_interval(ini,end,id_meter):            

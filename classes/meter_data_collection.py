@@ -1,9 +1,9 @@
 from sqlalchemy import Column, Integer, Float
 from classes.date import Smart_meter_date
-from declarative.classes import Row_data_dec
+from declarative.classes import Raw_data_dec
 from declarative.classes import Meter_data_dec
 from classes.meter_data import Meter_data
-from classes.row_data import Row_data
+from classes.raw_data import Raw_data
 from declarative.classes import Meter_data_collection_dec
 from sqlalchemy.orm import sessionmaker
 import matplotlib.pyplot as plt
@@ -34,7 +34,7 @@ class Meter_data_collection():
 
         ids = []
         if id_meters is None:
-            ids = Row_data.get_id_meters()
+            ids = Raw_data.get_id_meters()
         else:
             ids = id_meters
 

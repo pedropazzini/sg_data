@@ -18,7 +18,7 @@ class Smart_meter_date:
 
     def set_datetime(self,year,month,day,hour,minute):
         if (self.m_min_datetime.year > year):
-            raise NameError(print ("Onvalid year value:",year,". The year should be greather or equal to ",self.m_min_datetime.year))
+            raise NameError(print ("Invalid year value:",year,". The year should be greather or equal to ",self.m_min_datetime.year))
         else:
             self.m_real_datetime = datetime(year,month,day,hour,minute)            
             self.update_int_from_datetime()
@@ -37,14 +37,63 @@ class Smart_meter_date:
         share_seconds = seconds//60//30
         self.m_integer_date = days*100+share_seconds
 
+        if (self.m_integer_date % 100 == 0):
+            self.m_integer_date -= 52
+
     def is_day_of_week(self):
         return self.m_real_datetime.weekday() < 5
     # The function weekday() return the day of the week as an integer, where Monday is 0 and Sunday is 6.
+
+    def is_winter(self):
+        if (self.m_real_datetime.month == 1 or self.m_real_datetime.month == 2):
+            return True
+        elif((self.m_real_datetime.month ==12 and self.m_real_datetime.day >= 21) or (self.m_real_datetime.month == 3 and self.m_real_datetime.day < 21)):
+            return True
+
+    def is_summer(self):
+        if (self.m_real_datetime.month == 7 or self.m_real_datetime.month == 8):
+            return True
+        elif((self.m_real_datetime.month ==6 and self.m_real_datetime.day >= 21) or (self.m_real_datetime.month == 9 and self.m_real_datetime.day < 21)):
+            return True
+
+    def is_autumn(self):
+        if (self.m_real_datetime.month == 10 or self.m_real_datetime.month == 11):
+            return True
+        elif((self.m_real_datetime.month ==9 and self.m_real_datetime.day >= 21) or (self.m_real_datetime.month == 12 and self.m_real_datetime.day < 21)):
+            return True
+
+    def is_spring(self):
+        if (self.m_real_datetime.month == 4 or self.m_real_datetime.month == 5):
+            return True
+        elif((self.m_real_datetime.month ==3 and self.m_real_datetime.day >= 21) or (self.m_real_datetime.month == 6 and self.m_real_datetime.day < 21)):
+            return True
 
     def get_datetime(self):
         return self.m_real_datetime
 
     def get_integer_time(self):
         return self.m_integer_date
+
+    def add_time_delta(self, time_delta):
+        self.m_real_datetime = self.m_real_datetime + time_delta
+        self.update_int_from_datetime()
+
+    def __eq__(self, other):
+        return (self.m_integer_date == other.get_integer_time() and self.m_real_datetime == other.get_datetime())
+
+    def __gt__(self,other):
+        return (self.get_datetime() > other.get_datetime())
+
+    def __lt__(self,other):
+        return (self.get_datetime() < other.get_datetime())
+
+    def __ge__(self,other):
+        return (self.get_datetime() >= other.get_datetime())
+
+    def __le__(self,other):
+        return (self.get_datetime() <= other.get_datetime())
+
+    def __repr__(self):
+        return "<Smart_meter_date('m_real_datetime'=%s, 'm_integer_date'=%s>" % (self.m_real_datetime, self.m_integer_date)
 
 

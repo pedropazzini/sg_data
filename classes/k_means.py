@@ -5,17 +5,18 @@ import matplotlib.pyplot as plt
 
 class K_means:
 
-    __mu = None
-    __n_iter = None
-    __classification = None
-    __data = None
-    __dist_type = None
-    __k = None
-    __dic_results = {}
-    __best_clustering_result = None
-    __best_fitness = None
 
     def __init__(self,X,iterations=100,distance='euclidean',n_clusters=6,mu=np.array([]),print_iter=False):
+
+        self.__mu = None
+        self.__n_iter = None
+        self.__classification = None
+        self.__data = None
+        self.__dist_type = None
+        self.__k = None
+        self.__dic_results = {}
+        self.__best_clustering_result = None
+        self.__best_fitness = None
 
         assert (iterations > 1 and mu.size == 0), "mu Parameter necessary..."
 
@@ -124,13 +125,12 @@ class K_means:
         method = getattr(distance,distancetype)
         return method(p1,p2)
 
-    #def plot_as_time_series(self):
-
     def plot_as_time_series(self, ini=None, end=None):
         #cents = self.__best_clustering_result
         cents = range(0,self.__k)
         total = len(cents)
         total_meters = len(self.__data)
+        folder = './plots/'
         i = 0
         for c in cents:
             assigns = self.__data[self.__best_clustering_result == c]
@@ -145,7 +145,7 @@ class K_means:
                 #ax2.plot(self.__data[a])
                 ax2.plot(a)
 
-            filename = name.replace(' ','_').replace('~','_').replace('/','_') + '.png'
+            filename = folder + name.replace(' ','_').replace('~','_').replace('/','_') + '.png'
             f.savefig(filename)
 
             i = i + 1
@@ -165,7 +165,7 @@ class K_means:
         ax.set_label("x1")
         ax.set_label("x2")
         ax.set_label("x3")
-        ax.set_title("K-means (k=" + str(k) + ", distance=" + self.__dist_type + ")")
+        ax.set_title("K-means (k=" + str(k) + ", distance='" + self.__dist_type + "')")
 
         plt.show()
 
