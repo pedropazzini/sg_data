@@ -7,6 +7,7 @@ import numpy as np
 import colorsys
 import sys
 import pdb
+import time
 
 import matplotlib.pyplot as plt
 
@@ -30,24 +31,44 @@ class K_means_clustering(Clustering):
         self.solutions = {}
         self.validations = {}
 
+        self.time_clustering ={}
+        self.time_validating = {}
 
     def fit(self,verbose=False):
         self.normalize()
         for k in self.k_vector:
             for dist in self.distance_vector:
                 for algorithm in self.algorithm_vector:
+                    start_time = time.time() # start measuring time
                     if(verbose):
                         info = "algorithm=%s, k=%s, distance=%s" % (algorithm,k, dist)#
                         print(info)
                     if (algorithm == 'k-means'):
                         self.fit_by_k__means(k,dist,verbose)
+
                     elif (algorithm == 'k-means++'):
                         self.fit_by_k_means_pp()
                         #TODO: Remover continue apos implementar k-menas++
                         continue
 
+                    self.add_time_clustering(algorithm,dist,k,start_time)
+
                     self.add_solution(algorithm,dist,k)
+
                     self.validate_solution(algorithm,dist,k, verbose)
+
+    def add_time_clustering(self, algorithm, dist, k, start_time):
+
+        end_time = time.time()
+
+        if (algorithm not in self.time_clustering):
+            self.time_clustering[algorithm] = {}
+
+        if (dist not in self.time_clustering[algorithm]):
+            self.time_clustering[algorithm][dist] = {}
+
+        self.time_clustering[algorithm][dist][k] = end_time -start_time
+
 
     def add_solution(self,algorithm,dist,k):
 
@@ -64,19 +85,133 @@ class K_means_clustering(Clustering):
         #TODO: Implement other validation methods
         self.validate_solution_by_silhouette(algorithm,dist,k, verbose)
 
+        self.validate_solution_by_CDI(algorithm,dist,k,verbose)
+
+        self.validate_solution_by_MIA(algorithm,dist,k,verbose)
+
+    def validate_solution_by_MIA(self,algorithm,dist,k,verbose):
+
+        mia_val = float('inf')
+        cluster_data = self.solutions[algorithm][dist][k]
+        fitness = cluster_data[0]
+        if (verbose):
+            print("Calculating MIA of:")
+            print("Algorithm="+algorithm+", Distance=" + dist + ",K=" + str(k))
+            print ("Fitness = " + str(fitness))
+        cluster = cluster_data[1]
+        #method = getattr(distance,dist)
+        K = 0
+        d_hat = 0
+        representative_loads = {}
+
+        # Gets the distance between load diagrams in the same cluster
+        for c_id, points in cluster.items():
+            if (len(points) > 0):
+                K += 1
+            else:
+                continue
+            cluster_size = 0
+            d = 0
+            l = []
+            for pointA in points:
+                l.append(self.data[pointA])
+
+            representative_loads[c_id] = np.mean(l,axis=0)
+
+        d_hat = 0
+        for c_id, points in cluster.items():
+            n = 0
+            d = 0
+            for point in points:
+                n += 1
+                #TODO: Check if this value is to squared
+                # TODO: Chek if should not use the same metric distance of the algorithm and not chicco distance
+                d += self.get_chicco_distance_between_loads(representative_loads[c_id],self.data[point])
+            #TODO: Check if this value is to squared
+            d_hat += np.sqrt((1/n)*d)
+
+        #TODO: Check if this value is to squared
+        mia_val = np.sqrt((1/K)*d_hat)
+
+        self.add_validation('MIA',algorithm,dist,k,mia_val)
+
+    def validate_solution_by_CDI(self,algorithm,dist,k,verbose):
+
+        cdi_val = float('inf')
+        cluster_data = self.solutions[algorithm][dist][k]
+        fitness = cluster_data[0]
+        if (verbose):
+            print("Calculating CDI of:")
+            print("Algorithm="+algorithm+", Distance=" + dist + ",K=" + str(k))
+            print ("Fitness = " + str(fitness))
+        cluster = cluster_data[1]
+        #method = getattr(distance,dist)
+        K = 0
+        d_hat = 0
+        representative_loads = {}
+
+        # Gets the distance between load diagrams in the same cluster
+        for c_id, points in cluster.items():
+            if (len(points) > 0):
+                K += 1
+            else:
+                continue
+            cluster_size = 0
+            d = 0
+            l = []
+            for pointA in points:
+                PA = self.data[pointA]
+                l.append([PA])
+                for pointB in points:
+                    #TODO: Check if this value is to squared
+                    # TODO: Chek if should not use the same metric distance of the algorithm and not chicco distance
+                    d += self.get_chicco_distance_between_loads(PA,self.data[pointB])
+                    cluster_size += 1
+            representative_loads[c_id] = np.mean(l,axis=0)
+            #TODO: Check if this value is to squared
+            d_hat += np.sqrt(d/(2*cluster_size))
+
+        d = 0
+        cluster_size = 0
+        d_hat_repr = 0
+        for c_id_1, representative_load_1 in representative_loads.items():
+            for c_id_2, representative_load_2 in representative_loads.items():
+                #TODO: Check if this value is to squared
+                # TODO: Chek if should not use the same metric distance of the algorithm and not chicco distance
+                d += self.get_chicco_distance_between_loads(representative_load_1,representative_load_2)
+                cluster_size += 1
+
+        #TODO: Check if this value is to squared
+        d_hat_repr = np.sqrt(d/(2*cluster_size))
+
+        cdi_val = np.sqrt(d_hat/K)/d_hat_repr
+
+        self.add_validation('CDI',algorithm,dist,k,cdi_val)
+
+    def get_chicco_distance_between_loads(self,l1,l2):
+        '''
+        Distance between two elecric curve loads (time series as presented at:
+        Customer Characterization Options for Improvingi the Tariff Offer
+        Gianfranco Chicco, Roberto Napoli, Petru Postolache,
+        Mircea Scutariu and Cornel Toader
+        '''
+        H_1 = len(l1)
+        H_2 = len(l2)
+        if (H_1 != H_2):
+            raise ValueError("Loads should be of the same size")
+
+        return np.sqrt(np.sum(np.power(l1-l2,2))/H_1)
+
     def validate_solution_by_silhouette(self, algorithm, dist, k, verbose):
 
         s_is = {}
         cluster_data = self.solutions[algorithm][dist][k]
         fitness = cluster_data[0]
         if (verbose):
+            print("Calculating Silhouette of:")
+            print("Algorithm="+algorithm+", Distance=" + dist + ",K=" + str(k))
             print ("Fitness = " + str(fitness))
         cluster = cluster_data[1]
-        if (verbose):
-            print("Cluster = " + str(cluster))
-        centroids = self.get_centroids(dist,cluster)
-        if (verbose):
-            print("Centroids = " + str(centroids))
         #method = getattr(distance,dist)
         for c_id, points in cluster.items():
             a_vec = []
@@ -111,17 +246,20 @@ class K_means_clustering(Clustering):
 
         silhouette = np.mean(list(s_is.values()))
 
-        self.add_validation(algorithm,dist,k,silhouette)
+        self.add_validation('silhouette',algorithm,dist,k,silhouette)
 
-    def add_validation(self, algorithm,dist,k,s_i):
+    def add_validation(self,validation_alg, algorithm,dist,k,validation_val):
 
-        if (algorithm not in self.validations):
-            self.validations[algorithm] = {}
+        if (validation_alg not in self.validations):
+            self.validations[validation_alg] = {}
 
-        if(dist not in self.validations[algorithm]):
-            self.validations[algorithm][dist] = {}
+        if (algorithm not in self.validations[validation_alg]):
+            self.validations[validation_alg][algorithm] = {}
 
-        self.validations[algorithm][dist][k] = s_i
+        if(dist not in self.validations[validation_alg][algorithm]):
+            self.validations[validation_alg][algorithm][dist] = {}
+
+        self.validations[validation_alg][algorithm][dist][k] = validation_val
 
     def fit_by_k__means(self,k,dist, verbose):
         for i in range(self.max_iter):
@@ -166,7 +304,7 @@ class K_means_clustering(Clustering):
                             print("TODO: Invalid shape key[" + str(key) + "], pos[" + str(centroid_pos)  + "]:" + str(val.shape) + "/" + str(centroid_pos.shape))
                             if (len(centroid_pos) ==1):
                                 raise ValueError("Excecao")
-                            
+
                             print(centroids)
 
                 fitness += min_distance if min_distance != sys.float_info.max else 0
@@ -259,7 +397,7 @@ class K_means_clustering(Clustering):
                 y.append(pos[1])
 
             plt.plot(x,y,'o')
-        silhouette = self.validations[algorithm][distance][k]
+        silhouette = self.validations['silhouette'][algorithm][distance][k]
         title = algorithm + ", d=" + distance + ", k=" + str(k) + ", silh.=" + str(silhouette)
         plt.title(title)
         plt.show()
@@ -280,11 +418,21 @@ class K_means_clustering(Clustering):
                 axarr[1].plot(t_series)
                 l.append([t_series])
                 N += 1
-            m = np.mean(l,axis=0)
-            axarr[0].plot(m[0])
-            silhouette = self.validations[algorithm][distance][k]
+            mean = np.mean(l,axis=0)
+            std = np.std(l,axis=0)
+            min_ = np.min(l,axis=0)
+            max_ = np.max(l,axis=0)
+
+            axarr[0].plot(mean[0],label='mean',color='blue')
+            axarr[0].plot(min_[0],color='red')
+            axarr[0].plot(max_[0],label='min/max',color='red')
+            axarr[0].plot(mean[0] + std[0],color='green')
+            axarr[0].plot(mean[0] - std[0],label='std',color='green')
+
+            axarr[0].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+            silhouette = self.validations['silhouette'][algorithm][distance][k]
             title = algorithm + ", d=" + distance + ", (c/k)=(" + str(c) + "/" + str(k) + "), silh.=" + str(silhouette) + ", N_curves=" + str(N)
-            axarr[0].set_title(title)
+            axarr[1].set_title(title)
             plt.show()
             plt.savefig("./plots/" + key_name  + "_time_series__" + algorithm + "_" + distance +  "_" + str(k) + "_" + str(c) + ".png")
             plt.close(f)
@@ -300,26 +448,89 @@ class K_means_clustering(Clustering):
                     else:
                         self.plot_clusters(alg,dist,k, key_name)
 
-    def plot_silhouette(self, key_name):
+    def plot_validation(self, key_name, validation_alg):
         fig = plt.figure()
         for alg,d0 in self.solutions.items():
             for dist,d1 in d0.items():
                 s = []
                 ks = []
                 for k,d2 in d1.items():
-                    silhouette = self.validations[alg][dist][k]
+                    silhouette = self.validations[validation_alg][alg][dist][k]
                     s.append(silhouette)
                     ks.append(k)
 
                 plt.plot(ks,s, label= alg + "," + dist)
 
         plt.legend(loc="best")
-        title = "Silhouettes x K"
+        title = validation_alg + " x K"
         plt.title(title)
         plt.show()
 
-        plt.savefig("./plots/" + key_name + "_silhouette_curves.png")
+        plt.savefig("./plots/" + key_name + "_" + validation_alg  + "_curves.png")
         plt.close(fig)
+
+    def plot_validations(self,key_name):
+
+        validation_algorithms = ['silhouette','CDI','MIA']
+        for va in validation_algorithms:
+            self.plot_validation(key_name,va)
+
+    def plot_real_solution(self, n_expected_clusters, expected_solutions, algorithm,dist, key_name):
+
+        cluster = self.solutions[algorithm][dist][n_expected_clusters]
+        if not cluster:
+            raise ValueError("Cluster no found for parameters: {'Algorithm':%s,'Distance':%s,'N_expected_clustes':%s"%(algorithm,dist,n_expected_clusters))
+
+        for i in range(1,n_expected_clusters+1):
+            keys = [k for k,v in expected_solutions.items() if v == i]
+            l = []
+            f, axarr = plt.subplots(2, sharex=True)
+            N = 0
+            for key in keys:
+                t_series = self.data[key]
+                axarr[1].plot(t_series)
+                l.append([t_series])
+                N += 1
+            mean = np.mean(l,axis=0)
+            std = np.std(l,axis=0)
+            min_ = np.min(l,axis=0)
+            max_ = np.max(l,axis=0)
+
+            axarr[0].plot(mean[0],label='mean',color='blue')
+            axarr[0].plot(min_[0],color='red')
+            axarr[0].plot(max_[0],label='min/max',color='red')
+            axarr[0].plot(mean[0] + std[0],color='green')
+            axarr[0].plot(mean[0] - std[0],label='std',color='green')
+
+            axarr[0].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+                               ncol=3, mode="expand", borderaxespad=0.)
+
+            title = "Expected result: (c/k)=(" + str(i) + "/" + str(n_expected_clusters) + ")" +  ", N_curves=" + str(N)
+            axarr[1].set_title(title)
+            plt.show()
+            plt.savefig("./plots/" + key_name  + "_expected_time_series_"_ + str(n_expected_clusters) + "_" + str(i) + ".png")
+            plt.close(f)
+
+        summary = self.get_summary_of_solution(expected_solutions,algorithm,dist, n_expected_clusters)
+
+    def get_summary_of_solution(self, expected_solutions,algorithm,dist,k):
+
+        c_solutions = {}
+        cluster = self.solutions[algorithm][dist][k]
+        for c_id, points in cluster[1].items():
+            c_solutions[c_id] = []
+            for point in points:
+                c_solutions[c_id].append(expected_solutions[point])
+
+        c_summary = {}
+        for c_id, vals in c_solutions.items():
+            x = np.array(vals)
+            y = np.bincount(x.astype('int'))
+            ii = np.nonzero(y)[0]
+            c_summary[c_id] = np.vstack((ii,y[ii])).T
+
+        return c_summary
+
 
 
 
