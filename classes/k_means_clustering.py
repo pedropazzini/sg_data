@@ -4,6 +4,7 @@ from scipy.spatial import distance
 from copy import copy
 
 import numpy as np
+import pandas as pd
 import colorsys
 import sys
 import pdb
@@ -16,9 +17,6 @@ class K_means_clustering(Clustering):
     def __init__(self, data, k_vector, algorithm_vector, distance_vector,max_iter=10, keep_solutions = False, normalize_by_min=True, normalize_by_max=True):
 
         super(K_means_clustering,self).__init__(data,k_vector,algorithm_vector, distance_vector, normalize_by_min, normalize_by_max)
-
-        #TODO: ver como deletar isso direito
-        #del data[1012]
 
         self.max_iter = max_iter
         self.keep_solutions = keep_solutions
@@ -34,6 +32,18 @@ class K_means_clustering(Clustering):
         self.time_clustering ={}
         self.time_validating = {}
 
+        self.matrix_data = None
+        self.mins = None
+        self.maxs = None
+
+        self.data_frame = pd.DataFrame(self.data)
+
+    def gen_matrix_data(self):
+        if not self.matrix_data:
+            self.matrix_data = np.array([k for k in self.data.values()])
+            self.mins = np.min(self.matrix_data)
+            self.maxs = np.max(self.matrix_data)
+
     def fit(self,verbose=False):
         self.normalize()
         for k in self.k_vector:
@@ -47,9 +57,7 @@ class K_means_clustering(Clustering):
                         self.fit_by_k__means(k,dist,verbose)
 
                     elif (algorithm == 'k-means++'):
-                        self.fit_by_k_means_pp()
-                        #TODO: Remover continue apos implementar k-menas++
-                        continue
+                        self.fit_by_k_means_pp(k,dist,verbose)
 
                     self.add_time_clustering(algorithm,dist,k,start_time)
 
@@ -126,9 +134,10 @@ class K_means_clustering(Clustering):
                 n += 1
                 #TODO: Check if this value is to squared
                 # TODO: Chek if should not use the same metric distance of the algorithm and not chicco distance
-                d += self.get_chicco_distance_between_loads(representative_loads[c_id],self.data[point])
+                #d += self.get_chicco_distance_between_loads(representative_loads[c_id],self.data[point])
+                d += self.get_distance(dist, representative_loads[c_id],self.data[point])**2
             #TODO: Check if this value is to squared
-            d_hat += np.sqrt((1/n)*d)
+            d_hat += np.sqrt((1/n)*d)**2
 
         #TODO: Check if this value is to squared
         mia_val = np.sqrt((1/K)*d_hat)
@@ -165,11 +174,12 @@ class K_means_clustering(Clustering):
                 for pointB in points:
                     #TODO: Check if this value is to squared
                     # TODO: Chek if should not use the same metric distance of the algorithm and not chicco distance
-                    d += self.get_chicco_distance_between_loads(PA,self.data[pointB])
+                    #d += self.get_chicco_distance_between_loads(PA,self.data[pointB])
+                    d += self.get_distance(dist,PA,self.data[pointB])**2
                     cluster_size += 1
             representative_loads[c_id] = np.mean(l,axis=0)
             #TODO: Check if this value is to squared
-            d_hat += np.sqrt(d/(2*cluster_size))
+            d_hat += np.sqrt(d/(2*cluster_size))**2
 
         d = 0
         cluster_size = 0
@@ -178,11 +188,12 @@ class K_means_clustering(Clustering):
             for c_id_2, representative_load_2 in representative_loads.items():
                 #TODO: Check if this value is to squared
                 # TODO: Chek if should not use the same metric distance of the algorithm and not chicco distance
-                d += self.get_chicco_distance_between_loads(representative_load_1,representative_load_2)
+                #d += self.get_chicco_distance_between_loads(representative_load_1,representative_load_2)
+                d += self.get_distance(dist,representative_load_1,representative_load_2)**2
                 cluster_size += 1
 
         #TODO: Check if this value is to squared
-        d_hat_repr = np.sqrt(d/(2*cluster_size))
+        d_hat_repr = np.sqrt(d/(2*cluster_size))**2
 
         cdi_val = np.sqrt(d_hat/K)/d_hat_repr
 
@@ -261,11 +272,11 @@ class K_means_clustering(Clustering):
 
         self.validations[validation_alg][algorithm][dist][k] = validation_val
 
-    def fit_by_k__means(self,k,dist, verbose):
+    def fit_by_k__means(self,k,dist, verbose, is_kmeans_pp=False):
         for i in range(self.max_iter):
             if (verbose):
                 print("Iter: %s/%s"%(i,self.max_iter))
-            solution = self.generate_random_solution(k)
+            solution = self.generate_k_means_pp_solution(dist,k) if is_kmeans_pp else self.generate_random_solution(k)
             fitness, solution = self.converge_solution(dist,verbose,solution)
             if (self.keep_solutions):
                 self.iter_solutions[i] = (fitness,solution)
@@ -273,7 +284,6 @@ class K_means_clustering(Clustering):
             if(fitness < self.best_fitness):
                 self.best_fitness = fitness
                 self.best_solution = copy(solution)
-
 
 
     def converge_solution(self,dist,verbose,solution):
@@ -286,12 +296,13 @@ class K_means_clustering(Clustering):
             if (-1 in solution):
                 pdb.set_trace()
             centroids = self.get_centroids(dist,solution)
-            #method = getattr(distance,dist)
+
             fitness = 0
             for key, val in self.data.items():
                 min_distance = sys.float_info.max
                 best_centroid = -1
 
+                #Searches for the closest centroid
                 for centroid_num,centroid_pos in centroids.items():
                     if (val.shape == centroid_pos.shape):
                         #d = method(val,centroid_pos)
@@ -307,6 +318,7 @@ class K_means_clustering(Clustering):
 
                             print(centroids)
 
+                # Computes the fitness and adds the centroid to the closest cluster
                 fitness += min_distance if min_distance != sys.float_info.max else 0
                 if (best_centroid in new_solution):
                     new_solution[best_centroid].append(key)
@@ -316,6 +328,8 @@ class K_means_clustering(Clustering):
             iters += 1
             if (verbose):
                 print("fitness=" + str(fitness) + ", iter=" + str(iters))
+
+            # Checks the stop criteria which happens when there is no change in the solution or the max iters is reached
             if (solution == new_solution) or (iters > max_iters):
                 convergence = True
             else:
@@ -350,6 +364,61 @@ class K_means_clustering(Clustering):
         # TODO: Verificar se a média faz sentido para outras distâncias que não a Euclidiana
         return np.mean(vals,axis=0) if len(vals.shape) > 1 else vals
 
+    def get_dists_from_centers(self, centers, dist_type):
+
+        dist = pd.DataFrame()
+        for i in range(len(centers)):
+            a = np.array([self.get_distance(dist_type,centers[i],self.data_frame.iloc[:,j]) for j in range(self.data_frame.shape[1])])
+            dist.insert(0,i,a)
+
+        return dist.min(axis = 1)
+
+
+    def generate_k_means_pp_solution(self, dist_type, k):
+        total_len_data = len(self.data.keys())
+        #self.gen_matrix_data()
+        # Generates initial center
+        c1 = np.random.uniform(np.min(self.data_frame,axis =1),np.max(self.data_frame,axis=1))
+        centers = list([c1])
+
+        # Generates the other centers
+        for i in range(1,k):
+            dists = self.get_dists_from_centers(centers,dist_type)
+            normalized_distances = dists / dists.sum()
+            normalized_distances.sort()
+            dice_roll = np.random.rand()
+            min_over_roll = normalized_distances[normalized_distances.cumsum() >= dice_roll].min()
+            index = normalized_distances[normalized_distances == min_over_roll].index[0]
+            new_center = np.array(self.data_frame.iloc[:,index])
+            centers.append(new_center)
+
+        return self.get_solution_of_centroids(centers,dist_type)
+
+    def get_solution_of_centroids(self, centroids, dist_type):
+
+        solution = {}
+        for key,val in self.data_frame.iteritems():
+            np_d_array = np.array(val)
+
+            c = 0
+            min_dist = sys.float_info.max
+            k = -1
+            for centroid in centroids:
+                dist = self.get_distance(dist_type,centroid,np_d_array)
+                if (dist < min_dist):
+                    k = c
+                    min_dist = dist
+
+                c += 1
+
+            if (k in solution):
+                solution[k].append(key)
+            else:
+                solution[k] = list([key])
+
+        print(solution)
+        return solution
+
     def generate_random_solution(self,k):
         total_len_data = len(self.data.keys())
         solution = {}
@@ -375,8 +444,9 @@ class K_means_clustering(Clustering):
 
 
 
-    def fit_by_k_means_pp(self):
-        print("TODO")
+    def fit_by_k_means_pp(self, k, dist, verbose):
+
+        self.fit_by_k__means(k, dist, verbose, is_kmeans_pp = True)
 
     def plot_clusters(self, algorithm, distance, k, key_name):
 
@@ -429,7 +499,7 @@ class K_means_clustering(Clustering):
             axarr[0].plot(mean[0] + std[0],color='green')
             axarr[0].plot(mean[0] - std[0],label='std',color='green')
 
-            axarr[0].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+            axarr[0].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=3, mode="expand", borderaxespad=0.)
             silhouette = self.validations['silhouette'][algorithm][distance][k]
             title = algorithm + ", d=" + distance + ", (c/k)=(" + str(c) + "/" + str(k) + "), silh.=" + str(silhouette) + ", N_curves=" + str(N)
             axarr[1].set_title(title)
@@ -502,13 +572,12 @@ class K_means_clustering(Clustering):
             axarr[0].plot(mean[0] + std[0],color='green')
             axarr[0].plot(mean[0] - std[0],label='std',color='green')
 
-            axarr[0].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
-                               ncol=3, mode="expand", borderaxespad=0.)
+            axarr[0].legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=3, mode="expand", borderaxespad=0.)
 
             title = "Expected result: (c/k)=(" + str(i) + "/" + str(n_expected_clusters) + ")" +  ", N_curves=" + str(N)
             axarr[1].set_title(title)
             plt.show()
-            plt.savefig("./plots/" + key_name  + "_expected_time_series_"_ + str(n_expected_clusters) + "_" + str(i) + ".png")
+            plt.savefig("./plots/" + key_name  + "_expected_time_series__" + str(n_expected_clusters) + "_" + str(i) + ".png")
             plt.close(f)
 
         summary = self.get_summary_of_solution(expected_solutions,algorithm,dist, n_expected_clusters)

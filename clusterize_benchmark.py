@@ -22,16 +22,20 @@ with open(folder_name + benchmark + '/' + benchmark + '_TRAIN', 'r') as f:
         if label not in clusters_labels:
             clusters_labels.append(label)
 
-
-#algs = ['k-means','k-means++']
-algs = ['k-means']
+n_expected_cluster = len(clusters_labels)
+diff = 4
+min_k = 2 if n_expected_cluster - diff < 2 else n_expected_cluster - diff
+max_k = n_expected_cluster + diff
+algs = ['k-means','k-means++']
+#algs = ['k-means++']
 #dists = ['euclidean','cityblock','chebyshev','DTW','LB_Keogh']
-dists = ['euclidean']
+dists = ['euclidean','cityblock','chebyshev']
 #ks = list(range(2,15))
-ks = list(range(5,7))
+ks = list(range(min_k,max_k))
 normal_by_min = False
-k = K_means_clustering(data,ks,algs,dists,normalize_by_min = normal_by_min )
+k = K_means_clustering(data,ks,algs,dists,normalize_by_min = normal_by_min,keep_solutions = True )
 k.fit(verbose=True)
 k.plot_all(as_time_series=True,key_name=benchmark)
 k.plot_validations(key_name=benchmark)
 k.plot_real_solution(len(clusters_labels),expected,'k-means','euclidean',benchmark)
+k.plot_real_solution(len(clusters_labels),expected,'k-means++','euclidean',benchmark)
