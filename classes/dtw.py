@@ -20,6 +20,11 @@ class DTW:
         Calculates dynamic time warping Euclidean distance between two
         sequences. Option to enforce locality constraint for window w.
         '''
+
+        if (w is not None and w <= 0):
+            w = len(s1)//10 + 1
+
+
         DTW={}
 
         if w:
@@ -33,7 +38,7 @@ class DTW:
             for i in range(len(s2)):
                 DTW[(-1, i)] = float('inf')
 
-            DTW[(-1, -1)] = 0
+        DTW[(-1, -1)] = 0
 
         for i in range(len(s1)):
             if w:
